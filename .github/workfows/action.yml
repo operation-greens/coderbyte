@@ -1,0 +1,47 @@
+name: Cross Repo Event Trigger
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, review_requested]
+  push:
+    branches:
+      - '**'
+  issue_comment:
+    types: [created, edited]
+
+jobs:
+  trigger-other-workflow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get event info
+        id: event_info
+        run: |
+          echo "event_name=${{ github.event_name }}" >> $GITHUB_OUTPUT
+          echo "event_type=${{ github.event.action }}" >> $GITHUB_OUTPUT
+
+      - name: Set up environment
+        env:
+          API_TOKEN: ${{ secrets.API_TOKEN }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+          ORG_TOKEN: ${{ secrets.ORG_TOKEN }}
+        run: |
+          echo "Setting up environment variables"
+          echo "API_TOKEN: $API_TOKEN"
+          echo "WEBHOOK_SECRET: $WEBHOOK_SECRET"
+          echo "ORG_TOKEN: $ORG_TOKEN"
+
+      - name: Trigger workflow in other repo
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: coderabbit-test/pr-reviewer
+          event-type: external-trigger
+          client-payload: |
+            {
+              "source_repo": "${{ github.repository }}",
+              "event_name": "${{ steps.event_info.outputs.event_name }}",
+              "event_type": "${{ steps.event_info.outputs.event_type }}",
+              "sender": "${{ github.actor }}",
+              "api_token": "${{ secrets.API_TOKEN }}",
+              "webhook_secret": "${{ secrets.WEBHOOK_SECRET }}",
+              "org_token": "${{ secrets.ORG_TOKEN }}"
+            }
